@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30523.141
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AStarPathLibrary", "AStarPathLibrary\AStarPathLibrary.csproj", "{9A8C82D7-ADBB-468F-B45F-A8799E9D1C04}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AStarPathLibrary.TestApp", "AStarPathLibrary.TestApp\AStarPathLibrary.TestApp.csproj", "{77F9374A-E001-4D91-ACBA-D70F638711A5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9A8C82D7-ADBB-468F-B45F-A8799E9D1C04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A8C82D7-ADBB-468F-B45F-A8799E9D1C04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A8C82D7-ADBB-468F-B45F-A8799E9D1C04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A8C82D7-ADBB-468F-B45F-A8799E9D1C04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77F9374A-E001-4D91-ACBA-D70F638711A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77F9374A-E001-4D91-ACBA-D70F638711A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77F9374A-E001-4D91-ACBA-D70F638711A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77F9374A-E001-4D91-ACBA-D70F638711A5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {535803C9-BFBB-47B6-8CC2-B7A5F2843436}
+	EndGlobalSection
+EndGlobal
