@@ -6,37 +6,37 @@ namespace AStarPathLibrary
     public sealed partial class AStarPathfinder
     {
         // Heap (simple list but used as a heap, cf. Steve Rabin's game gems article)
-        readonly List<Node> _openList;
+        private readonly List<Node> _openList;
         // Closed list is a list.
-        readonly List<Node> _closedList;
+        private readonly List<Node> _closedList;
 
         // Successors is a list filled out by the user each type successors to a node are generated
-        readonly List<Node> _successors;
+        private readonly List<Node> _successors;
         // State
-        SearchState _searchState = SearchState.NotInitialized;
+        private SearchState _searchState = SearchState.NotInitialized;
         // Counts steps
-        int _steps = 0;
+        private int _steps = 0;
         // Start and goal state pointers
-        Node _startNode = null;
-        Node _goalNode = null;
-        Node _currentSolutionNode = null;
+        private Node _startNode = null;
+        private Node _goalNode = null;
+        private Node _currentSolutionNode = null;
 
         // Memory
-        readonly List<Node> _fixedSizeAllocator;
-        int _allocateNodeCount = 0;
-        bool _cancelRequest = false;
-        int _allocatedMapSearchNodes = 0;
-        readonly List<MapSearchNode> _mapSearchNodePool = null;
-        int _openListHighWaterMark = 0;
-        int _closedListHighWaterMark = 0;
-        int _successorListHighWaterMark = 0;
+        private readonly List<Node> _fixedSizeAllocator;
+        private int _allocateNodeCount = 0;
+        private bool _cancelRequest = false;
+        private int _allocatedMapSearchNodes = 0;
+        private readonly List<MapSearchNode> _mapSearchNodePool = null;
+        private int _openListHighWaterMark = 0;
+        private int _closedListHighWaterMark = 0;
+        private int _successorListHighWaterMark = 0;
 
         // Fixed sizes for collections
-        readonly int _kPreallocatedNodes = 4000;
-        readonly int _kPreallocatedMapSearchNodes = 1000;
-        readonly int _kPreallocatedOpenListSlots = 32;
-        readonly int _kPreallocatedClosedListSlots = 256;
-        readonly int _kPreallocatedSuccessorSlots = 8;
+        private readonly int _kPreallocatedNodes = 4000;
+        private readonly int _kPreallocatedMapSearchNodes = 1000;
+        private readonly int _kPreallocatedOpenListSlots = 32;
+        private readonly int _kPreallocatedClosedListSlots = 256;
+        private readonly int _kPreallocatedSuccessorSlots = 8;
 
 
         // constructor just initialises private data
@@ -63,13 +63,10 @@ namespace AStarPathLibrary
         }
 
         // call at any time to cancel the search and free up all the memory
-        public void CancelSearch()
-        {
-            this._cancelRequest = true;
-        }
+        public void CancelSearch() => this._cancelRequest = true;
 
         // Build the open list as sorted to begin with by inserting new elements in the right place
-        void SortedAddToOpenList(Node node)
+        private void SortedAddToOpenList(Node node)
         {
             bool inserted = false;
 
@@ -93,7 +90,7 @@ namespace AStarPathLibrary
             }
         }
 
-        Node AllocateNode()
+        private Node AllocateNode()
         {
             if (_allocateNodeCount >= _kPreallocatedNodes)
             {
@@ -103,7 +100,7 @@ namespace AStarPathLibrary
             return _fixedSizeAllocator[_allocateNodeCount++];
         }
 
-        public MapSearchNode AllocateMapSearchNode(NodePosition nodePosition)
+        private MapSearchNode AllocateMapSearchNode(NodePosition nodePosition)
         {
             if (_allocatedMapSearchNodes >= _kPreallocatedMapSearchNodes)
             {
@@ -114,7 +111,7 @@ namespace AStarPathLibrary
             return _mapSearchNodePool[_allocatedMapSearchNodes++];
         }
 
-        public void InitiatePathfind()
+        private void InitiatePathfind()
         {
             _cancelRequest = false;
             _allocateNodeCount = 0;	// Reset our used node tracking
@@ -122,7 +119,7 @@ namespace AStarPathLibrary
         }
 
         // Set Start and goal states
-        public void SetStartAndGoalStates(MapSearchNode startSearchNode, MapSearchNode goalSearchNode)
+        private void SetStartAndGoalStates(MapSearchNode startSearchNode, MapSearchNode goalSearchNode)
         {
             _startNode = AllocateNode();
             _goalNode = AllocateNode();
@@ -146,14 +143,10 @@ namespace AStarPathLibrary
 
             // Initialise counter for search steps
             _steps = 0;
-
-#if PATHFIND_DEBUG
-            System.Console.WriteLine("Starting pathfind. Start: " + m_Start.m_UserState.position + ", Goal: " + m_Goal.m_UserState.position);
-#endif
         }
 
         // Advances search one step
-        public SearchState SearchStep()
+        private SearchState SearchStep()
         {
             // Firstly break if the user has not initialised the search
             System.Diagnostics.Debug.Assert((_searchState > SearchState.NotInitialized) && (_searchState < SearchState.Invalid));
@@ -210,11 +203,6 @@ namespace AStarPathLibrary
 
                 // delete nodes that aren't needed for the solution
                 //FreeUnusedNodes();
-
-#if PATHFIND_DEBUG
-                System.Console.WriteLine("GOAL REACHED! Steps: " + m_Steps + ", allocated nodes: " + m_AllocateNodeCount + ", MapSearchNodes: " + allocatedMapSearchNodes);
-                System.Console.WriteLine("High water marks - Open:" + openListHighWaterMark + ", Closed: " + closedListHighWaterMark + ", Successors: " + successorListHighWaterMark);
-#endif
 
                 _searchState = SearchState.Succeeded;
                 return _searchState;
@@ -346,7 +334,7 @@ namespace AStarPathLibrary
 
         // User calls this to add a successor to a list of successors
         // when expanding the search frontier
-        public bool AddSuccessor(MapSearchNode state)
+        private bool AddSuccessor(MapSearchNode state)
         {
             Node node = AllocateNode();
 
@@ -366,7 +354,7 @@ namespace AStarPathLibrary
         }
 
         // Get start node
-        public MapSearchNode GetSolutionStart()
+        private MapSearchNode GetSolutionStart()
         {
             _currentSolutionNode = _startNode;
 
@@ -381,7 +369,7 @@ namespace AStarPathLibrary
         }
 
         // Get next node
-        public MapSearchNode GetSolutionNext()
+        private MapSearchNode GetSolutionNext()
         {
             if (_currentSolutionNode != null)
             {
@@ -399,7 +387,7 @@ namespace AStarPathLibrary
         // Free the solution nodes
         // This is done to clean up all used Node memory when you are done with the
         // search
-        public void FreeSolutionNodes()
+        private void FreeSolutionNodes()
         {
             _openList.Clear();
             _closedList.Clear();
@@ -468,8 +456,6 @@ namespace AStarPathLibrary
             }
             return newPath;
         }
-
-
     }
 }
 
