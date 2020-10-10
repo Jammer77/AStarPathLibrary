@@ -134,7 +134,7 @@ namespace AStarPathLibrary
             // Initialise the AStar specific parts of the Start Node
             // The user only needs fill out the state information
             _startNode.g = 0;
-            _startNode.h = _startNode.UserStateMapSearchNode.GoalDistanceEstimate(_goalNode.UserStateMapSearchNode);
+            _startNode.h = _startNode.UserStateMapSearchNode.DistanceEstimate(_goalNode.UserStateMapSearchNode);
             _startNode.f = _startNode.g + _startNode.h;
             _startNode.Parent = null;
 
@@ -177,7 +177,7 @@ namespace AStarPathLibrary
             //System.Console.WriteLine("Checking node at " + n.m_UserState.position + ", f: " + n.f);
 
             // Check for the goal, once we pop that we're done
-            if (node.UserStateMapSearchNode.IsGoal(_goalNode.UserStateMapSearchNode))
+            if (node.UserStateMapSearchNode.IsEqual(_goalNode.UserStateMapSearchNode))
             {
                 // The user is going to use the Goal Node he passed in
                 // so copy the parent pointer of n
@@ -186,7 +186,7 @@ namespace AStarPathLibrary
 
                 // A special case is that the goal was passed in as the start state
                 // so handle that here
-                if (false == node.UserStateMapSearchNode.IsSameState(_startNode.UserStateMapSearchNode))
+                if (!node.UserStateMapSearchNode.IsEqual(_startNode.UserStateMapSearchNode))
                 {
                     // set the child pointers in each node (except Goal which has no child)
                     Node nodeChild = _goalNode;
@@ -218,11 +218,11 @@ namespace AStarPathLibrary
                 bool ret;
                 if (node.Parent != null)
                 {
-                    ret = node.UserStateMapSearchNode.GetSuccessors(this, node.Parent.UserStateMapSearchNode);
+                    ret = node.UserStateMapSearchNode.GetSuccessors(node.Parent.UserStateMapSearchNode);
                 }
                 else
                 {
-                    ret = node.UserStateMapSearchNode.GetSuccessors(this, null);
+                    ret = node.UserStateMapSearchNode.GetSuccessors(null);
                 }
 
                 if (!ret)
@@ -256,7 +256,7 @@ namespace AStarPathLibrary
                     for (int j = 0; j < openlist_size; ++j)
                     {
                         openlist_result = _openList[j];
-                        if (openlist_result.UserStateMapSearchNode.IsSameState(successor.UserStateMapSearchNode))
+                        if (openlist_result.UserStateMapSearchNode.IsEqual(successor.UserStateMapSearchNode))
                         {
                             foundOpenNode = true;
                             break;
@@ -279,7 +279,7 @@ namespace AStarPathLibrary
                     for (int k = 0; k < closedlist_size; ++k)
                     {
                         closedlist_result = _closedList[k];
-                        if (closedlist_result.UserStateMapSearchNode.IsSameState(successor.UserStateMapSearchNode))
+                        if (closedlist_result.UserStateMapSearchNode.IsEqual(successor.UserStateMapSearchNode))
                         {
                             foundClosedNode = true;
                             break;
@@ -300,7 +300,7 @@ namespace AStarPathLibrary
                     // so lets keep it and set up its AStar specific data ...
                     successor.Parent = node;
                     successor.g = newg;
-                    successor.h = successor.UserStateMapSearchNode.GoalDistanceEstimate(_goalNode.UserStateMapSearchNode);
+                    successor.h = successor.UserStateMapSearchNode.DistanceEstimate(_goalNode.UserStateMapSearchNode);
                     successor.f = successor.g + successor.h;
 
                     // Remove successor from closed if it was on it
@@ -356,15 +356,7 @@ namespace AStarPathLibrary
         private MapSearchNode GetSolutionStart()
         {
             _currentSolutionNode = _startNode;
-
-            if (_startNode != null)
-            {
-                return _startNode.UserStateMapSearchNode;
-            }
-            else
-            {
-                return null;
-            }
+            return _startNode?.UserStateMapSearchNode;
         }
 
         // Get next node
