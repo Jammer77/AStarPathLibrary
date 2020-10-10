@@ -94,7 +94,7 @@ namespace AStarPathLibrary
         {
             if (_allocateNodeCount >= _kPreallocatedNodes)
             {
-                System.Console.WriteLine("FATAL - Pathfinder ran out of preallocated nodes!");
+                Console.WriteLine("FATAL - Pathfinder ran out of preallocated nodes!");
             }
 
             return _fixedSizeAllocator[_allocateNodeCount++];
@@ -104,14 +104,14 @@ namespace AStarPathLibrary
         {
             if (_allocatedMapSearchNodes >= _kPreallocatedMapSearchNodes)
             {
-                System.Console.WriteLine("FATAL - HexGrid has run out of preallocated MapSearchNodes!");
+                Console.WriteLine("FATAL - HexGrid has run out of preallocated MapSearchNodes!");
             }
 
             _mapSearchNodePool[_allocatedMapSearchNodes].Position = nodePosition;
             return _mapSearchNodePool[_allocatedMapSearchNodes++];
         }
 
-        private void InitiatePathfind()
+        private void Init()
         {
             _cancelRequest = false;
             _allocateNodeCount = 0;	// Reset our used node tracking
@@ -215,7 +215,7 @@ namespace AStarPathLibrary
 
                 // User provides this functions and uses AddSuccessor to add each successor of
                 // node 'n' to m_Successors
-                bool ret = false;
+                bool ret;
                 if (node.Parent != null)
                 {
                     ret = node.UserStateMapSearchNode.GetSuccessors(this, node.Parent.UserStateMapSearchNode);
@@ -236,12 +236,11 @@ namespace AStarPathLibrary
                     return _searchState;
                 }
 
-                // Now handle each successor to the current node ...
-                Node successor = null;
                 int successors_size = _successors.Count;
                 for (int i = 0; i < successors_size; ++i)
                 {
-                    successor = _successors[i];
+                    // Now handle each successor to the current node ...
+                    Node successor = _successors[i];
 
                     // 	The g value for this successor ...
                     float newg = node.g + node.UserStateMapSearchNode.GetCost(successor.UserStateMapSearchNode);
@@ -400,7 +399,7 @@ namespace AStarPathLibrary
         }
         public List<NodePosition> Calculate((int, int) startPoint, (int, int) goalPoint)
         {
-            this.InitiatePathfind();
+            this.Init();
 
             // Create a start state
             MapSearchNode nodeStart = this.AllocateMapSearchNode(new NodePosition(startPoint));
@@ -412,7 +411,7 @@ namespace AStarPathLibrary
             this.SetStartAndGoalStates(nodeStart, nodeEnd);
 
             // Set state to Searching and perform the search
-            AStarPathfinder.SearchState searchState = AStarPathfinder.SearchState.Searching;
+            AStarPathfinder.SearchState searchState = SearchState.Searching;
             uint searchSteps = 0;
 
             do
@@ -420,10 +419,10 @@ namespace AStarPathLibrary
                 searchState = this.SearchStep();
                 searchSteps++;
             }
-            while (searchState == AStarPathfinder.SearchState.Searching);
+            while (searchState == SearchState.Searching);
 
             // Search complete
-            bool pathfindSucceeded = (searchState == AStarPathfinder.SearchState.Succeeded);
+            bool pathfindSucceeded = (searchState == SearchState.Succeeded);
 
             var newPath = new List<NodePosition>();
 

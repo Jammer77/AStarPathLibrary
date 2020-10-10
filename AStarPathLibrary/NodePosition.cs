@@ -1,5 +1,8 @@
-﻿namespace AStarPathLibrary
+﻿using System.Diagnostics;
+
+namespace AStarPathLibrary
 {
+    [DebuggerDisplay("{X},{Y}")]
     public struct NodePosition
     {
         private readonly int _x;
@@ -20,5 +23,6 @@
             this._x = x;
             this._y = y;
         }
+
     }
 }
