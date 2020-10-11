@@ -4,14 +4,18 @@
     {
         // A node represents a possible state in the search
         // The user provided state type is included inside this type
-        class Node
+        private class Node
         {
             private Node _parent; // used during the search to record the parent of successor nodes
             private Node _child; // used after the search for the application to view the search in reverse
 
-            public float g; // cost of this node + it's predecessors
-            public float h; // heuristic estimate of distance to goal
-            public float f; // sum of cumulative cost of predecessors and self and heuristic
+            private float _cost; // cost of this node + it's predecessors
+            private float _distance; // heuristic estimate of distance to goal
+            private float _distanceCostSum; // sum of cumulative cost of predecessors and self and heuristic
+
+            public float Cost { get => this._cost; set => this._cost = value; }
+            public float Distance { get => this._distance; set => this._distance = value; }
+            public float DistanceCostSum { get => this._distanceCostSum; set => this._distanceCostSum = value; }
 
             public Node()
             {
@@ -22,9 +26,9 @@
             {
                 Parent = null;
                 Child = null;
-                g = 0.0f;
-                h = 0.0f;
-                f = 0.0f;
+                Cost = 0.0f;
+                Distance = 0.0f;
+                DistanceCostSum = 0.0f;
             }
 
             private MapSearchNode _userState;

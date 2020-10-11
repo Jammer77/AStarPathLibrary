@@ -37,10 +37,10 @@ namespace AStarPathLibrary
             }
 
             public bool IsEqual(MapSearchNode nodeGoal) =>
-                (this.Position.X == nodeGoal.Position.X && this.Position.Y == nodeGoal.Position.Y);
+                this.Position.X == nodeGoal.Position.X && this.Position.Y == nodeGoal.Position.Y;
 
             public bool IsNeigbourValid(int xOffset, int yOffset) =>
-                (this._getMapDelegate(Position.X + xOffset, Position.Y + yOffset) < NON_WALKABLE);
+                this._getMapDelegate(Position.X + xOffset, Position.Y + yOffset) < NON_WALKABLE;
                 // Return true if the node is navigable and within grid bounds
 
             void AddNeighbourNode(int xOffset, int yOffset, NodePosition parentPos)
