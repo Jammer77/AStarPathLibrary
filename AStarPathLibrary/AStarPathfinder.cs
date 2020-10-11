@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace AStarPathLibrary
 {
@@ -13,6 +14,8 @@ namespace AStarPathLibrary
 
         // Successors is a list filled out by the user each type successors to a node are generated
         private readonly List<Node> _successorsList;
+        private readonly Func<int, int, int> _getMapDelegate;
+
         // State
         private SearchState _searchState = SearchState.NotInitialized;
         // Start and goal state pointers
@@ -25,7 +28,7 @@ namespace AStarPathLibrary
         private int _allocateNodeCount;
         private bool _cancelRequest = false;
         private int _allocatedMapSearchNodes;
-        private readonly List<MapSearchNode> _mapSearchNodePoolList;
+        private readonly List<Node> _mapSearchNodePoolList;
         private int _openListHighWaterMark;
         private int _closedListHighWaterMark;
         private int _successorListHighWaterMark;
@@ -37,24 +40,28 @@ namespace AStarPathLibrary
         private readonly int _kPreallocatedClosedListSlots = 256;
         private readonly int _kPreallocatedSuccessorSlots = 8;
 
+        private List<Node> SuccessorsList => this._successorsList;
+
+        private const int NON_WALKABLE = 9;
         // constructor just initialises private data
         public AStarPathfinder(Func<int, int, int> getMap)
         {
             _openList = new List<Node>(_kPreallocatedOpenListSlots);
             _closedList = new List<Node>(_kPreallocatedClosedListSlots);
             _successorsList = new List<Node>(_kPreallocatedSuccessorSlots);
+            _getMapDelegate = getMap;
 
             _fixedSizeAllocatorNodeList = new List<Node>(_kPreallocatedNodes);
             for (int i = 0; i < _kPreallocatedNodes; ++i)
             {
-                var node = new Node();
+                var node = new Node(this, getMap);
                 _fixedSizeAllocatorNodeList.Add(node);
             }
 
-            _mapSearchNodePoolList = new List<MapSearchNode>(_kPreallocatedMapSearchNodes);
+            _mapSearchNodePoolList = new List<Node>(_kPreallocatedMapSearchNodes);
             for (int i = 0; i < _kPreallocatedMapSearchNodes; ++i)
             {
-                var mapSearchNode = new MapSearchNode(this, getMap);
+                var mapSearchNode = new Node(this, getMap);
                 _mapSearchNodePoolList.Add(mapSearchNode);
             }
         }
@@ -97,7 +104,7 @@ namespace AStarPathLibrary
             return _fixedSizeAllocatorNodeList[_allocateNodeCount++];
         }
 
-        private MapSearchNode AllocateMapSearchNode(NodePosition nodePosition)
+        private Node AllocateMapSearchNode(NodePosition nodePosition)
         {
             if (_allocatedMapSearchNodes >= _kPreallocatedMapSearchNodes)
             {
@@ -116,22 +123,24 @@ namespace AStarPathLibrary
         }
 
         // Set Start and goal states
-        private void SetStartAndGoalStates(MapSearchNode startSearchNode, MapSearchNode goalSearchNode)
+        private void SetStartAndGoalStates(Node startSearchNode, Node goalSearchNode)
         {
             _startNode = AllocateNode();
             _goalNode = AllocateNode();
+            _startNode.Position = startSearchNode.Position;
+            _goalNode.Position = goalSearchNode.Position;
 
             Debug.Assert(_startNode != null && _goalNode != null);
 
-            _startNode.UserStateMapSearchNode = startSearchNode;
-            _goalNode.UserStateMapSearchNode = goalSearchNode;
+            //_startNode.UserStateMapSearchNode = startSearchNode;
+            //_goalNode.UserStateMapSearchNode = goalSearchNode;
 
             _searchState = SearchState.Searching;
 
             // Initialise the AStar specific parts of the Start Node
             // The user only needs fill out the state information
             _startNode.Cost = 0;
-            _startNode.Distance = _startNode.UserStateMapSearchNode.DistanceEstimate(_goalNode.UserStateMapSearchNode);
+            _startNode.Distance = _startNode.DistanceEstimate(_goalNode);
             _startNode.DistanceCostSum = _startNode.Cost + _startNode.Distance;
             _startNode.Parent = null;
 
@@ -167,7 +176,7 @@ namespace AStarPathLibrary
             //System.Console.WriteLine("Checking node at " + n.m_UserState.position + ", f: " + n.f);
 
             // Check for the goal, once we pop that we're done
-            if (node.UserStateMapSearchNode.IsEqual(_goalNode.UserStateMapSearchNode))
+            if (node.IsEqual(_goalNode))
             {
                 // The user is going to use the Goal Node he passed in
                 // so copy the parent pointer of n
@@ -176,7 +185,7 @@ namespace AStarPathLibrary
 
                 // A special case is that the goal was passed in as the start state
                 // so handle that here
-                if (!node.UserStateMapSearchNode.IsEqual(_startNode.UserStateMapSearchNode))
+                if (!node.IsEqual(_startNode))
                 {
                     // set the child pointers in each node (except Goal which has no child)
                     Node nodeChild = _goalNode;
@@ -201,23 +210,23 @@ namespace AStarPathLibrary
             {
                 // We now need to generate the successors of this node
                 // The user helps us to do this, and we keep the new nodes in m_Successors ...
-                _successorsList.Clear(); // empty vector of successor nodes to n
+                SuccessorsList.Clear(); // empty vector of successor nodes to n
 
                 // User provides this functions and uses AddSuccessor to add each successor of
                 // node 'n' to m_Successors
-                bool ret;
-                if (node.Parent != null)
-                {
-                    ret = node.UserStateMapSearchNode.GetSuccessors(node.Parent.UserStateMapSearchNode);
-                }
-                else
-                {
-                    ret = node.UserStateMapSearchNode.GetSuccessors(null);
-                }
+
+                //var successors = this.GetSuccessors(node);
+                //bool ret = successors.Any();
+                //foreach (var successor in successors)
+                //{
+                //    AddSuccessor(successor);
+                //}
+
+                bool ret = node.GetSuccessors(node.Parent);
 
                 if (!ret)
                 {
-                    _successorsList.Clear(); // empty vector of successor nodes to n
+                    SuccessorsList.Clear(); // empty vector of successor nodes to n
 
                     // free up everything else we allocated
                     FreeSolutionNodes();
@@ -226,15 +235,15 @@ namespace AStarPathLibrary
                     return _searchState;
                 }
 
-                int successors_size = _successorsList.Count;
+                int successors_size = SuccessorsList.Count;
                 
                 for (int i = 0; i < successors_size; ++i)
                 {
                     // Now handle each successor to the current node ...
-                    Node successor = _successorsList[i];
+                    Node successor = SuccessorsList[i];
 
                     // 	The g value for this successor ...
-                    float newg = node.Cost + node.UserStateMapSearchNode.GetCost(successor.UserStateMapSearchNode);
+                    float newg = node.Cost + node.GetCost(successor);
 
                     // Now we need to find whether the node is on the open or closed lists
                     // If it is but the node that is already on them is better (lower g)
@@ -247,7 +256,7 @@ namespace AStarPathLibrary
                     for (int j = 0; j < openlist_size; ++j)
                     {
                         openlist_result = _openList[j];
-                        if (openlist_result.UserStateMapSearchNode.IsEqual(successor.UserStateMapSearchNode))
+                        if (openlist_result.IsEqual(successor))
                         {
                             foundOpenNode = true;
                             break;
@@ -270,7 +279,7 @@ namespace AStarPathLibrary
                     for (int k = 0; k < closedlist_size; ++k)
                     {
                         closedlist_result = _closedList[k];
-                        if (closedlist_result.UserStateMapSearchNode.IsEqual(successor.UserStateMapSearchNode))
+                        if (closedlist_result.IsEqual(successor))
                         {
                             foundClosedNode = true;
                             break;
@@ -291,7 +300,7 @@ namespace AStarPathLibrary
                     // so lets keep it and set up its AStar specific data ...
                     successor.Parent = node;
                     successor.Cost = newg;
-                    successor.Distance = successor.UserStateMapSearchNode.DistanceEstimate(_goalNode.UserStateMapSearchNode);
+                    successor.Distance = successor.DistanceEstimate(_goalNode);
                     successor.DistanceCostSum = successor.Cost + successor.Distance;
 
                     // Remove successor from closed if it was on it
@@ -322,20 +331,49 @@ namespace AStarPathLibrary
             return _searchState; // 'Succeeded' bool is false at this point.
         }
 
+        private IEnumerable<Node> GetSuccessors(Node node)
+        {
+            var result = new List<Node>();
+            NodePosition parentPos = node.Parent == null ? new NodePosition(0, 0) : node.Parent.Position;
+
+            result.Add(AddNeighbourNode(-1, 0, parentPos, node));
+            result.Add(AddNeighbourNode(0, -1, parentPos, node));
+            result.Add(AddNeighbourNode(1, 0, parentPos, node));
+            result.Add(AddNeighbourNode(0, 1, parentPos, node));
+
+            return result.Where( o => o != null);
+        }
+
+        public bool IsNeigbourValid(NodePosition node, int xOffset, int yOffset) =>
+                this._getMapDelegate(node.X + xOffset, node.Y + yOffset) < NON_WALKABLE;
+
+        private Node AddNeighbourNode(int xOffset, int yOffset, NodePosition parentPos, Node node)
+        {
+            Node newNode = null;
+            bool isNeigbourValid = IsNeigbourValid(node.Position, xOffset, yOffset);
+            if (isNeigbourValid &&
+                !(parentPos.X == node.Position.X + xOffset && parentPos.Y == node.Position.Y + yOffset))
+            {
+                var neighbourPos = new NodePosition(node.Position.X + xOffset, node.Position.Y + yOffset);
+                newNode = this.AllocateMapSearchNode(neighbourPos);
+            }
+            return newNode;
+        }
         // User calls this to add a successor to a list of successors
         // when expanding the search frontier
-        private bool AddSuccessor(MapSearchNode state)
+        private bool AddSuccessor(Node state)
         {
             Node node = AllocateNode();
+            node.Position = state.Position;
 
             if (node != null)
             {
-                node.UserStateMapSearchNode = state;
-                _successorsList.Add(node);
+                //node.UserStateMapSearchNode = state;
+                SuccessorsList.Add(node);
 
-                if (_successorsList.Count > _successorListHighWaterMark)
+                if (SuccessorsList.Count > _successorListHighWaterMark)
                 {
-                    _successorListHighWaterMark = _successorsList.Count;
+                    _successorListHighWaterMark = SuccessorsList.Count;
                 }
                 return true;
             }
@@ -344,14 +382,14 @@ namespace AStarPathLibrary
         }
 
         // Get start node
-        private MapSearchNode GetSolutionStart()
+        private Node GetSolutionStart()
         {
             _currentSolutionNode = _startNode;
-            return _startNode?.UserStateMapSearchNode;
+            return _startNode;
         }
 
         // Get next node
-        private MapSearchNode GetSolutionNext()
+        private Node GetSolutionNext()
         {
             if (_currentSolutionNode != null)
             {
@@ -359,7 +397,7 @@ namespace AStarPathLibrary
                 {
                     Node child = _currentSolutionNode.Child;
                     _currentSolutionNode = _currentSolutionNode.Child;
-                    return child.UserStateMapSearchNode;
+                    return child;
                 }
             }
 
@@ -374,7 +412,7 @@ namespace AStarPathLibrary
         {
             _openList.Clear();
             _closedList.Clear();
-            _successorsList.Clear();
+            SuccessorsList.Clear();
 
             for (int i = 0; i < _kPreallocatedNodes; ++i)
             {
@@ -386,10 +424,10 @@ namespace AStarPathLibrary
             this.Init();
 
             // Create a start state
-            MapSearchNode nodeStart = this.AllocateMapSearchNode(new NodePosition(startPoint));
+            Node nodeStart = this.AllocateMapSearchNode(new NodePosition(startPoint));
 
             // Define the goal state
-            MapSearchNode nodeEnd = this.AllocateMapSearchNode(new NodePosition(goalPoint));
+            Node nodeEnd = this.AllocateMapSearchNode(new NodePosition(goalPoint));
 
             // Set Start and goal states
             this.SetStartAndGoalStates(nodeStart, nodeEnd);
@@ -416,7 +454,7 @@ namespace AStarPathLibrary
                 int numSolutionNodes = 0;	// Don't count the starting cell in the path length
 
                 // Get the start node
-                MapSearchNode node = this.GetSolutionStart();
+                Node node = this.GetSolutionStart();
                 newPath.Add(node.Position);
                 ++numSolutionNodes;
 
