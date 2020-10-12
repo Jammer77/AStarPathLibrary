@@ -7,69 +7,31 @@ namespace AStarPathLibrary
 {
     public sealed partial class AStarPathfinder
     {
-        // Heap (simple list but used as a heap, cf. Steve Rabin's game gems article)
+        private const int NON_WALKABLE = 9;
         private readonly List<Node> _openList;
-        // Closed list is a list.
         private readonly List<Node> _closedList;
+        //private readonly List<Node> _fixedSizeAllocatorNodeList;
+        //private readonly List<Node> _mapSearchNodePoolList;
 
-        // Successors is a list filled out by the user each type successors to a node are generated
-        private readonly List<Node> _successorsList;
         private readonly Func<int, int, int> _getMapDelegate;
-
-        // State
         private SearchState _searchState = SearchState.NotInitialized;
-        // Start and goal state pointers
+        
         private Node _startNode;
         private Node _goalNode;
         private Node _currentSolutionNode;
-
-        // Memory
-        private readonly List<Node> _fixedSizeAllocatorNodeList;
-        private int _allocateNodeCount;
-        private bool _cancelRequest = false;
-        private int _allocatedMapSearchNodes;
-        private readonly List<Node> _mapSearchNodePoolList;
         private int _openListHighWaterMark;
         private int _closedListHighWaterMark;
-        private int _successorListHighWaterMark;
 
-        // Fixed sizes for collections
-        private readonly int _kPreallocatedNodes = 4000;
-        private readonly int _kPreallocatedMapSearchNodes = 1000;
-        private readonly int _kPreallocatedOpenListSlots = 32;
-        private readonly int _kPreallocatedClosedListSlots = 256;
-        private readonly int _kPreallocatedSuccessorSlots = 8;
+        private readonly int _openListSize = 32;
+        private readonly int _closeListSize = 256;
 
-        private List<Node> SuccessorsList => this._successorsList;
-
-        private const int NON_WALKABLE = 9;
-        // constructor just initialises private data
-        public AStarPathfinder(Func<int, int, int> getMap)
+        public AStarPathfinder(Func<int, int, int> getMapDelegate)
         {
-            _openList = new List<Node>(_kPreallocatedOpenListSlots);
-            _closedList = new List<Node>(_kPreallocatedClosedListSlots);
-            _successorsList = new List<Node>(_kPreallocatedSuccessorSlots);
-            _getMapDelegate = getMap;
-
-            _fixedSizeAllocatorNodeList = new List<Node>(_kPreallocatedNodes);
-            for (int i = 0; i < _kPreallocatedNodes; ++i)
-            {
-                var node = new Node(this, getMap);
-                _fixedSizeAllocatorNodeList.Add(node);
-            }
-
-            _mapSearchNodePoolList = new List<Node>(_kPreallocatedMapSearchNodes);
-            for (int i = 0; i < _kPreallocatedMapSearchNodes; ++i)
-            {
-                var mapSearchNode = new Node(this, getMap);
-                _mapSearchNodePoolList.Add(mapSearchNode);
-            }
+            _openList = new List<Node>(_openListSize);
+            _closedList = new List<Node>(_closeListSize);
+            _getMapDelegate = getMapDelegate;
         }
 
-        // call at any time to cancel the search and free up all the memory
-        public void CancelSearch() => this._cancelRequest = true;
-
-        // Build the open list as sorted to begin with by inserting new elements in the right place
         private void SortedAddToOpenList(Node node)
         {
             bool inserted = false;
@@ -79,6 +41,7 @@ namespace AStarPathLibrary
                 if (node.DistanceCostSum < _openList[i].DistanceCostSum)
                 {
                     _openList.Insert(i, node);
+                    inserted = true;
                     break;
                 }
             }
@@ -94,57 +57,16 @@ namespace AStarPathLibrary
             }
         }
 
-        private Node AllocateNode()
-        {
-            if (_allocateNodeCount >= _kPreallocatedNodes)
-            {
-                Console.WriteLine("FATAL - Pathfinder ran out of preallocated nodes!");
-            }
-
-            return _fixedSizeAllocatorNodeList[_allocateNodeCount++];
-        }
-
-        private Node AllocateMapSearchNode(NodePosition nodePosition)
-        {
-            if (_allocatedMapSearchNodes >= _kPreallocatedMapSearchNodes)
-            {
-                Console.WriteLine("FATAL - HexGrid has run out of preallocated MapSearchNodes!");
-            }
-
-            _mapSearchNodePoolList[_allocatedMapSearchNodes].Position = nodePosition;
-            return _mapSearchNodePoolList[_allocatedMapSearchNodes++];
-        }
-
-        private void Init()
-        {
-            _cancelRequest = false;
-            _allocateNodeCount = 0;	// Reset our used node tracking
-            _allocatedMapSearchNodes = 0;
-        }
-
-        // Set Start and goal states
         private void SetStartAndGoalStates(Node startSearchNode, Node goalSearchNode)
         {
-            _startNode = AllocateNode();
-            _goalNode = AllocateNode();
-            _startNode.Position = startSearchNode.Position;
-            _goalNode.Position = goalSearchNode.Position;
-
-            Debug.Assert(_startNode != null && _goalNode != null);
-
-            //_startNode.UserStateMapSearchNode = startSearchNode;
-            //_goalNode.UserStateMapSearchNode = goalSearchNode;
+            _startNode = startSearchNode;
+            _goalNode = goalSearchNode;
 
             _searchState = SearchState.Searching;
 
-            // Initialise the AStar specific parts of the Start Node
-            // The user only needs fill out the state information
             _startNode.Cost = 0;
-            _startNode.Distance = _startNode.DistanceEstimate(_goalNode);
+            _startNode.Distance = _startNode.CalculateDistance(_goalNode);
             _startNode.DistanceCostSum = _startNode.Cost + _startNode.Distance;
-            _startNode.Parent = null;
-
-            // Push the start node on the Open list
             _openList.Add(_startNode);
         }
 
@@ -162,7 +84,7 @@ namespace AStarPathLibrary
             // Failure is defined as emptying the open list as there is nothing left to
             // search...
             // New: Allow user abort
-            if (_openList.Count == 0 || _cancelRequest)
+            if (_openList.Count == 0)
             {
                 FreeSolutionNodes();
                 _searchState = SearchState.Failed;
@@ -208,39 +130,22 @@ namespace AStarPathLibrary
             }
             else // not goal
             {
-                // We now need to generate the successors of this node
-                // The user helps us to do this, and we keep the new nodes in m_Successors ...
-                SuccessorsList.Clear(); // empty vector of successor nodes to n
-
-                // User provides this functions and uses AddSuccessor to add each successor of
-                // node 'n' to m_Successors
-
-                //var successors = this.GetSuccessors(node);
-                //bool ret = successors.Any();
-                //foreach (var successor in successors)
-                //{
-                //    AddSuccessor(successor);
-                //}
-
-                bool ret = node.GetSuccessors(node.Parent);
+                var successors = this.GetSuccessors(node).ToList();
+                bool ret = successors.Any();
 
                 if (!ret)
                 {
-                    SuccessorsList.Clear(); // empty vector of successor nodes to n
-
-                    // free up everything else we allocated
                     FreeSolutionNodes();
-
                     _searchState = SearchState.OutOfMemory;
                     return _searchState;
                 }
 
-                int successors_size = SuccessorsList.Count;
+                int successors_size = successors.Count;
                 
                 for (int i = 0; i < successors_size; ++i)
                 {
                     // Now handle each successor to the current node ...
-                    Node successor = SuccessorsList[i];
+                    Node successor = successors[i];
 
                     // 	The g value for this successor ...
                     float newg = node.Cost + node.GetCost(successor);
@@ -300,7 +205,7 @@ namespace AStarPathLibrary
                     // so lets keep it and set up its AStar specific data ...
                     successor.Parent = node;
                     successor.Cost = newg;
-                    successor.Distance = successor.DistanceEstimate(_goalNode);
+                    successor.Distance = successor.CalculateDistance(_goalNode);
                     successor.DistanceCostSum = successor.Cost + successor.Distance;
 
                     // Remove successor from closed if it was on it
@@ -341,7 +246,7 @@ namespace AStarPathLibrary
             result.Add(AddNeighbourNode(1, 0, parentPos, node));
             result.Add(AddNeighbourNode(0, 1, parentPos, node));
 
-            return result.Where( o => o != null);
+            return result.Where( o => o != null); //TODO
         }
 
         public bool IsNeigbourValid(NodePosition node, int xOffset, int yOffset) =>
@@ -354,31 +259,10 @@ namespace AStarPathLibrary
             if (isNeigbourValid &&
                 !(parentPos.X == node.Position.X + xOffset && parentPos.Y == node.Position.Y + yOffset))
             {
-                var neighbourPos = new NodePosition(node.Position.X + xOffset, node.Position.Y + yOffset);
-                newNode = this.AllocateMapSearchNode(neighbourPos);
+                (int, int) neighbourPos = (node.Position.X + xOffset, node.Position.Y + yOffset);
+                newNode = new Node(neighbourPos, this, _getMapDelegate);
             }
             return newNode;
-        }
-        // User calls this to add a successor to a list of successors
-        // when expanding the search frontier
-        private bool AddSuccessor(Node state)
-        {
-            Node node = AllocateNode();
-            node.Position = state.Position;
-
-            if (node != null)
-            {
-                //node.UserStateMapSearchNode = state;
-                SuccessorsList.Add(node);
-
-                if (SuccessorsList.Count > _successorListHighWaterMark)
-                {
-                    _successorListHighWaterMark = SuccessorsList.Count;
-                }
-                return true;
-            }
-
-            return false;
         }
 
         // Get start node
@@ -400,7 +284,6 @@ namespace AStarPathLibrary
                     return child;
                 }
             }
-
             return null;
         }
 
@@ -412,22 +295,12 @@ namespace AStarPathLibrary
         {
             _openList.Clear();
             _closedList.Clear();
-            SuccessorsList.Clear();
-
-            for (int i = 0; i < _kPreallocatedNodes; ++i)
-            {
-                _fixedSizeAllocatorNodeList[i].ReInitialize();
-            }
         }
+
         public List<NodePosition> Calculate((int, int) startPoint, (int, int) goalPoint)
         {
-            this.Init();
-
-            // Create a start state
-            Node nodeStart = this.AllocateMapSearchNode(new NodePosition(startPoint));
-
-            // Define the goal state
-            Node nodeEnd = this.AllocateMapSearchNode(new NodePosition(goalPoint));
+            var nodeStart = new Node(startPoint, this, _getMapDelegate);
+            var nodeEnd = new Node(goalPoint, this, _getMapDelegate);
 
             // Set Start and goal states
             this.SetStartAndGoalStates(nodeStart, nodeEnd);
