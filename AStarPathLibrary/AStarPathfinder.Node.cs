@@ -21,7 +21,6 @@ namespace AStarPathLibrary
             public float Distance { get => this._distance; set => this._distance = value; }
             public float DistanceCostSum { get => this._distanceCostSum; set => this._distanceCostSum = value; }
 
-            private readonly AStarPathfinder _pathfinder;
             private readonly Func<int, int, int> _getMapDelegate;
 
             private NodePosition _position;
@@ -51,14 +50,13 @@ namespace AStarPathLibrary
             {
                 ReInitialize();
                 this._position = new NodePosition(coord);
-                this._pathfinder = pathfinder;
                 this._getMapDelegate = getMapDelegate;
             }
 
             public float CalculateDistance(Node nodeGoal)
             {
-                double diffX = (double)(Position.X - nodeGoal.Position.X);
-                double diffY = (double)(Position.Y - nodeGoal.Position.Y);
+                double diffX = Position.X - nodeGoal.Position.X;
+                double diffY = Position.Y - nodeGoal.Position.Y;
                 return (float)Math.Sqrt((diffX * diffX) + (diffY * diffY));
             }
 
